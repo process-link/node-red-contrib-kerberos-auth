@@ -1,0 +1,27 @@
+{
+  "name": "@processlink/node-red-contrib-kerberos-auth",
+  "version": "1.0.0",
+  "description": "Node-RED node for HTTP requests with Kerberos/SPNEGO authentication, designed for PI Web API",
+  "keywords": [
+    "node-red",
+    "kerberos",
+    "spnego",
+    "negotiate",
+    "pi web api",
+    "osisoft",
+    "aveva",
+    "windows authentication"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "kerberos": "^2.2.0"
+  },
+  "node-red": {
+    "nodes": {
+      "kerberos-auth": "kerberos-auth/kerberos-auth.js"
+    }
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

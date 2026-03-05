@@ -1,0 +1,182 @@
+<!-- ─── Config Node Registration ─────────────────────────────── -->
+
+<script type="text/javascript">
+    RED.nodes.registerType('kerberos-auth-config', {
+        category: 'config',
+        defaults: {
+            name: { value: '' },
+            baseUrl: { value: '', required: true },
+            serviceFqdn: { value: '' },
+            rejectUnauthorized: { value: true }
+        },
+        credentials: {
+            domain: { type: 'text' },
+            user: { type: 'text' },
+            password: { type: 'password' }
+        },
+        label: function () {
+            return this.name || this.baseUrl || 'Kerberos Server';
+        }
+    });
+</script>
+
+<script type="text/html" data-template-name="kerberos-auth-config">
+    <div class="form-row">
+        <label for="node-config-input-name"><i class="fa fa-tag"></i> Name</label>
+        <input type="text" id="node-config-input-name" placeholder="PI Web API Server">
+    </div>
+    <div class="form-row">
+        <label for="node-config-input-baseUrl"><i class="fa fa-globe"></i> Base URL</label>
+        <input type="text" id="node-config-input-baseUrl" placeholder="https://piserver.domain.com/piwebapi">
+    </div>
+    <div class="form-row">
+        <label for="node-config-input-serviceFqdn"><i class="fa fa-server"></i> Service FQDN</label>
+        <input type="text" id="node-config-input-serviceFqdn" placeholder="piserver.domain.com (optional, extracted from URL)">
+    </div>
+    <div class="form-row">
+        <input type="checkbox" id="node-config-input-rejectUnauthorized" checked style="width:auto; vertical-align:top;">
+        <label for="node-config-input-rejectUnauthorized" style="width:auto"> Verify SSL Certificate</label>
+    </div>
+    <hr>
+    <div class="form-row">
+        <label><i class="fa fa-user-secret"></i> Credentials</label>
+        <span class="form-tips">Leave blank to use current Windows user (SSPI)</span>
+    </div>
+    <div class="form-row">
+        <label for="node-config-input-domain"><i class="fa fa-building"></i> Domain</label>
+        <input type="text" id="node-config-input-domain" placeholder="MYDOMAIN (optional)">
+    </div>
+    <div class="form-row">
+        <label for="node-config-input-user"><i class="fa fa-user"></i> Username</label>
+        <input type="text" id="node-config-input-user" placeholder="username">
+    </div>
+    <div class="form-row">
+        <label for="node-config-input-password"><i class="fa fa-lock"></i> Password</label>
+        <input type="password" id="node-config-input-password">
+    </div>
+</script>
+
+<!-- ─── Request Node Registration ───────────────────────────── -->
+
+<script type="text/javascript">
+    RED.nodes.registerType('kerberos-auth', {
+        category: 'network',
+        color: '#C7D9A8',
+        defaults: {
+            name: { value: '' },
+            server: { value: '', type: 'kerberos-auth-config', required: true },
+            method: { value: 'GET' },
+            url: { value: '' },
+            ret: { value: 'obj' }
+        },
+        inputs: 1,
+        outputs: 1,
+        icon: 'white-globe.svg',
+        label: function () {
+            if (this.name) return this.name;
+            var m = (this.method !== 'use') ? this.method : 'http';
+            return m + ' ' + (this.url || '');
+        },
+        labelStyle: function () {
+            return this.name ? 'node_label_italic' : '';
+        },
+        paletteLabel: 'kerberos http'
+    });
+</script>
+
+<script type="text/html" data-template-name="kerberos-auth">
+    <div class="form-row">
+        <label for="node-input-server"><i class="fa fa-server"></i> Server</label>
+        <input type="text" id="node-input-server">
+    </div>
+    <div class="form-row">
+        <label for="node-input-method"><i class="fa fa-tasks"></i> Method</label>
+        <select id="node-input-method">
+            <option value="GET">GET</option>
+            <option value="POST">POST</option>
+            <option value="PUT">PUT</option>
+            <option value="DELETE">DELETE</option>
+            <option value="PATCH">PATCH</option>
+            <option value="use">- set by msg.method -</option>
+        </select>
+    </div>
+    <div class="form-row">
+        <label for="node-input-url"><i class="fa fa-globe"></i> URL Path</label>
+        <input type="text" id="node-input-url" placeholder="/system or full URL">
+    </div>
+    <div class="form-row">
+        <label for="node-input-ret"><i class="fa fa-arrow-left"></i> Return</label>
+        <select id="node-input-ret">
+            <option value="obj">a parsed JSON object</option>
+            <option value="txt">a UTF-8 string</option>
+            <option value="bin">a binary buffer</option>
+        </select>
+    </div>
+    <div class="form-row">
+        <label for="node-input-name"><i class="fa fa-tag"></i> Name</label>
+        <input type="text" id="node-input-name" placeholder="Name">
+    </div>
+</script>
+
+<!-- ─── Help Panels ─────────────────────────────────────────── -->
+
+<script type="text/html" data-help-name="kerberos-auth-config">
+    <p>Configuration for a Kerberos-authenticated server (e.g. PI Web API).</p>
+    <h3>Settings</h3>
+    <dl>
+        <dt>Base URL</dt>
+        <dd>The base URL of the server, e.g. <code>https://piserver.domain.com/piwebapi</code></dd>
+        <dt>Service FQDN</dt>
+        <dd>Optional. The fully qualified hostname of the target service for the SPN (e.g. <code>piserver.domain.com</code>).
+            If blank, the hostname is extracted from the Base URL.</dd>
+        <dt>Verify SSL Certificate</dt>
+        <dd>Uncheck this if the server uses a self-signed certificate.</dd>
+    </dl>
+    <h3>Credentials</h3>
+    <p>On <b>Windows</b>: leave credentials blank to use the current Windows user's
+    identity via SSPI. Or provide explicit domain/username/password.</p>
+    <p>On <b>Linux</b>: the kerberos package uses GSSAPI. You must have a valid
+    Kerberos ticket in the credential cache (run <code>kinit user@REALM</code> first).
+    The username/password fields are not used on Linux.</p>
+    <h3>Prerequisites</h3>
+    <ul>
+        <li><b>Windows</b>: No extra setup needed if the machine is domain-joined. For non-domain machines, provide explicit credentials.</li>
+        <li><b>Linux</b>: Install <code>libkrb5-dev</code> and configure <code>/etc/krb5.conf</code>. Run <code>kinit</code> to obtain a ticket.</li>
+        <li>Network access from this machine to the Active Directory / KDC server</li>
+    </ul>
+</script>
+
+<script type="text/html" data-help-name="kerberos-auth">
+    <p>Makes HTTP requests with Kerberos/SPNEGO authentication.
+    Designed for OSIsoft/AVEVA PI Web API but works with any server
+    that uses Windows Negotiate authentication.</p>
+
+    <h3>Inputs</h3>
+    <dl class="message-properties">
+        <dt class="optional">url <span class="property-type">string</span></dt>
+        <dd>URL path appended to the server base URL. Overrides the node's configured URL.
+            Can also be a full URL starting with <code>http://</code> or <code>https://</code>.</dd>
+        <dt class="optional">method <span class="property-type">string</span></dt>
+        <dd>HTTP method. Only used when the node is set to "set by msg.method".</dd>
+        <dt class="optional">payload <span class="property-type">object | string | buffer</span></dt>
+        <dd>Request body for POST, PUT, and PATCH requests. Objects are JSON-serialized automatically.</dd>
+        <dt class="optional">headers <span class="property-type">object</span></dt>
+        <dd>Additional HTTP headers to include in the request.</dd>
+    </dl>
+
+    <h3>Outputs</h3>
+    <dl class="message-properties">
+        <dt>payload <span class="property-type">object | string | buffer</span></dt>
+        <dd>The response body, parsed according to the Return setting.</dd>
+        <dt>statusCode <span class="property-type">number</span></dt>
+        <dd>The HTTP status code of the response.</dd>
+        <dt>headers <span class="property-type">object</span></dt>
+        <dd>The response headers.</dd>
+    </dl>
+
+    <h3>Details</h3>
+    <p>The node generates a SPNEGO token for each request using the Kerberos
+    credentials configured on the server node. If a request returns 401, the node
+    will retry once with a fresh token.</p>
+    <p>On Windows, the node uses SSPI. On Linux, it uses GSSAPI.</p>
+</script>
