@@ -8,12 +8,21 @@ The built-in Node-RED HTTP request node doesn't support Kerberos. The `node-red-
 
 ## Install
 
+### From the Node-RED Palette Manager
+
+1. Open Node-RED in your browser
+2. Go to **Menu** (top right) > **Manage palette** > **Install**
+3. Search for `kerberos-auth`
+4. Click **Install**
+
+### From the command line
+
 ```bash
 cd ~/.node-red
 npm install @processlink/node-red-contrib-kerberos-auth
 ```
 
-Or install from GitHub:
+Or install directly from GitHub:
 
 ```bash
 cd ~/.node-red
