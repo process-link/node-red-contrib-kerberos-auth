@@ -2,6 +2,8 @@ module.exports = function (RED) {
     const { initializeClient } = require('kerberos');
     const https = require('https');
 
+    const VALID_METHODS = ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'HEAD', 'OPTIONS'];
+
     // ─── Config Node ───────────────────────────────────────────────
     function KerberosAuthConfigNode(config) {
         RED.nodes.createNode(this, config);
@@ -10,6 +12,11 @@ module.exports = function (RED) {
         node.baseUrl = (config.baseUrl || '').replace(/\/+$/, '');
         node.serviceFqdn = config.serviceFqdn || '';
         node.rejectUnauthorized = config.rejectUnauthorized !== false;
+
+        // Reusable HTTPS agent for when SSL verification is disabled
+        if (!node.rejectUnauthorized) {
+            node._agent = new https.Agent({ rejectUnauthorized: false });
+        }
 
         // Resolve the service principal name (SPN)
         node._getServicePrincipal = function () {
@@ -57,7 +64,10 @@ module.exports = function (RED) {
         };
 
         node.on('close', function () {
-            // No persistent state to clean up with the kerberos package
+            if (node._agent) {
+                node._agent.destroy();
+                node._agent = null;
+            }
         });
     }
 
@@ -88,63 +98,66 @@ module.exports = function (RED) {
         node.on('input', async function (msg, send, done) {
             send = send || function () { node.send.apply(node, arguments); };
 
-            const method = (node.method === 'use')
-                ? (msg.method || 'GET').toUpperCase()
-                : node.method.toUpperCase();
-
-            // Build full URL
-            let urlPath = msg.url || node.url || '';
             let fullUrl;
-            if (urlPath.startsWith('http://') || urlPath.startsWith('https://')) {
-                // Validate that absolute URLs match the configured base URL origin
-                // to prevent SSRF (sending Kerberos tokens to unintended servers)
-                try {
+
+            try {
+                const method = (node.method === 'use')
+                    ? (msg.method || 'GET').toUpperCase()
+                    : node.method.toUpperCase();
+
+                if (!VALID_METHODS.includes(method)) {
+                    throw new Error('Invalid HTTP method: ' + method);
+                }
+
+                // Build full URL
+                const urlPath = msg.url || node.url || '';
+                if (urlPath.startsWith('http://') || urlPath.startsWith('https://')) {
+                    // Validate that absolute URLs match the configured base URL origin
+                    // to prevent SSRF (sending Kerberos tokens to unintended servers)
                     const targetOrigin = new URL(urlPath).origin;
                     const baseOrigin = new URL(node.server.baseUrl).origin;
                     if (targetOrigin !== baseOrigin) {
                         throw new Error('URL origin "' + targetOrigin + '" does not match configured server "' + baseOrigin + '". Blocked to prevent sending credentials to an unintended server.');
                     }
-                } catch (e) {
-                    if (e.message.includes('does not match')) throw e;
-                    throw new Error('Invalid URL: ' + urlPath);
-                }
-                fullUrl = urlPath;
-            } else {
-                fullUrl = node.server.baseUrl + '/' + urlPath.replace(/^\//, '');
-            }
-
-            // Build headers
-            const headers = Object.assign(
-                { 'Accept': 'application/json' },
-                msg.headers || {}
-            );
-
-            // Build fetch options
-            const fetchOptions = {
-                method: method,
-                headers: headers
-            };
-
-            // Body for POST/PUT/PATCH
-            if (['POST', 'PUT', 'PATCH'].includes(method) && msg.payload !== undefined) {
-                if (typeof msg.payload === 'object' && !(msg.payload instanceof Buffer)) {
-                    fetchOptions.body = JSON.stringify(msg.payload);
-                    if (!headers['Content-Type']) {
-                        headers['Content-Type'] = 'application/json';
-                    }
+                    fullUrl = urlPath;
                 } else {
-                    fetchOptions.body = msg.payload;
+                    fullUrl = node.server.baseUrl + '/' + urlPath.replace(/^\//, '');
                 }
-            }
 
-            // TLS options for self-signed certs
-            if (!node.server.rejectUnauthorized) {
-                fetchOptions.agent = new https.Agent({ rejectUnauthorized: false });
-            }
+                // Build headers
+                const headers = Object.assign(
+                    { 'Accept': 'application/json' },
+                    msg.headers || {}
+                );
 
-            node.status({ fill: 'blue', shape: 'dot', text: 'requesting...' });
+                // Build fetch options
+                const fetchOptions = {
+                    method: method,
+                    headers: headers
+                };
 
-            try {
+                // Body for POST/PUT/PATCH
+                if (['POST', 'PUT', 'PATCH'].includes(method) && msg.payload !== undefined) {
+                    if (typeof msg.payload === 'object' && !(msg.payload instanceof Buffer)) {
+                        fetchOptions.body = JSON.stringify(msg.payload);
+                        if (!headers['Content-Type']) {
+                            headers['Content-Type'] = 'application/json';
+                        }
+                    } else {
+                        fetchOptions.body = msg.payload;
+                    }
+                }
+
+                // TLS: reuse the shared agent when SSL verification is disabled
+                if (node.server._agent) {
+                    fetchOptions.agent = node.server._agent;
+                }
+
+                // Request timeout (30 seconds)
+                fetchOptions.signal = AbortSignal.timeout(30000);
+
+                node.status({ fill: 'blue', shape: 'dot', text: 'requesting...' });
+
                 const response = await makeAuthenticatedRequest(node, fullUrl, fetchOptions, true);
                 const statusCode = response.status;
 
@@ -180,7 +193,7 @@ module.exports = function (RED) {
                 send(msg);
                 if (done) done();
             } catch (err) {
-                node.status({ fill: 'red', shape: 'ring', text: err.message.substring(0, 32) });
+                node.status({ fill: 'red', shape: 'ring', text: (err.message || 'error').substring(0, 32) });
                 const errorMsg = formatError(err, fullUrl);
                 if (done) {
                     done(errorMsg);
@@ -217,6 +230,9 @@ module.exports = function (RED) {
 
     function formatError(err, url) {
         const msg = err.message || String(err);
+        if (err.name === 'TimeoutError' || msg.includes('abort')) {
+            return 'Request timed out: ' + url;
+        }
         if (msg.includes('ENOTFOUND')) {
             return 'Server not found: ' + url;
         }
