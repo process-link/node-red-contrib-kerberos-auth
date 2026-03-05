@@ -12,6 +12,15 @@
     "aveva",
     "windows authentication"
   ],
+  "author": {
+    "name": "Process Link Pty Ltd",
+    "url": "https://processlink.com.au"
+  },
+  "homepage": "https://github.com/process-link/node-red-contrib-kerberos-auth",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/process-link/node-red-contrib-kerberos-auth.git"
+  },
   "license": "MIT",
   "dependencies": {
     "kerberos": "^2.2.0"

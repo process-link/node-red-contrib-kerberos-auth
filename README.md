@@ -133,6 +133,10 @@ There's a standalone test script to verify Kerberos works before you wire anythi
 2. Run `node test.js`
 3. If you see PI Web API system info, you're good
 
+## Author
+
+Built and maintained by [Process Link Pty Ltd](https://processlink.com.au).
+
 ## License
 
 MIT
