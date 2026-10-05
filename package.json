@@ -23,7 +23,7 @@
   },
   "license": "MIT",
   "dependencies": {
-    "kerberos": "^2.2.0"
+    "kerberos": "^7.0.0"
   },
   "node-red": {
     "nodes": {
