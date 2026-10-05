@@ -1,0 +1,21 @@
+# Dependabot version updates for every ecosystem in this repository.
+# Minor and patch version updates are grouped. Major updates stay
+# individual, and security updates are left ungrouped.
+version: 2
+updates:
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "08:00"
+      timezone: "Australia/Sydney"
+    open-pull-requests-limit: 5
+    groups:
+      npm-minor-patch:
+        applies-to: "version-updates"
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
